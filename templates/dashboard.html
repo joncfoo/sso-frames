@@ -10,4 +10,11 @@
     <img src="/static/chart.png">
 </p>
 </body>
+<script>
+    const es = new EventSource("/events?stream=messages")
+    es.addEventListener('message', (ev) => {
+        console.log(ev.data, ev.lastEventId)
+        window.location.reload()
+    })
+</script>
 </html>

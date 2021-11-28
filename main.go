@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
-	"github.com/alexedwards/scs/v2"
-	"github.com/coreos/go-oidc/v3/oidc"
-	"golang.org/x/oauth2"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/abiosoft/ishell/v2"
+	"github.com/alexedwards/scs/v2"
+	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/r3labs/sse/v2"
+	"golang.org/x/oauth2"
 )
 
 func main() {
@@ -27,14 +30,8 @@ func main() {
 	idTokenVerifier := provider.Verifier(&oidc.Config{ClientID: oauth2Config.ClientID})
 
 	session := scs.New()
-	session.Cookie = scs.SessionCookie{
-		Name:     "session",
-		HttpOnly: true,
-		Path:     "/",
-		Persist:  true,
-		SameSite: http.SameSiteLaxMode,
-		Secure:   true,
-	}
+	session.Cookie.SameSite = http.SameSiteLaxMode
+	session.Cookie.Secure = true
 
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
@@ -100,10 +97,56 @@ func main() {
 		http.Redirect(w, r, "/", http.StatusFound)
 	})
 
-	handlers := session.LoadAndSave(mux)
+	events := sse.New()
+	events.AutoReplay = false
+	events.AutoStream = false
+	events.CreateStream("messages")
 
-	err = http.ListenAndServeTLS(":8443", "./cert.pem", "./cert-key.pem", handlers)
-	if err != nil {
-		log.Fatal(err)
-	}
+	combined := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sessionH := session.LoadAndSave(mux)
+		if r.URL.Path == "/events" {
+			events.ServeHTTP(w, r)
+			return
+		}
+		sessionH.ServeHTTP(w, r)
+	})
+
+	go func() {
+		err := http.ListenAndServeTLS(":8443", "./cert.pem", "./cert-key.pem", combined)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	shell := ishell.New()
+	shell.AddCmd(&ishell.Cmd{
+		Name: "same-site",
+		Help: "set cookie samesite",
+		Func: func(c *ishell.Context) {
+
+			options := []string{"lax", "strict", "none"}
+			choice := c.MultiChoice(options, "Set Cookie SameSite")
+			switch choice {
+			case 0:
+				session.Cookie.SameSite = http.SameSiteLaxMode
+			case 1:
+				session.Cookie.SameSite = http.SameSiteStrictMode
+			case 2:
+				session.Cookie.SameSite = http.SameSiteNoneMode
+			}
+
+			err := session.Iterate(context.Background(), func(c context.Context) error {
+				return session.Destroy(c)
+			})
+			if err != nil {
+				log.Println(err)
+			}
+
+			events.Publish("messages", &sse.Event{
+				Data: []byte("samesite=" + options[choice]),
+			})
+		},
+	})
+
+	shell.Run()
 }
