@@ -41,22 +41,34 @@ func main() {
 
 		email := session.GetString(r.Context(), "email")
 
-		var err error
-
 		if email == "" {
 			// no user in session
 
-			err = templates.ExecuteTemplate(w, "login-redirect.html", map[string]string{
-				"url": oauth2Config.AuthCodeURL("abcdefghijkl"),
-			})
-		} else {
-			// user exists; show the sauce!
-
-			err = templates.ExecuteTemplate(w, "dashboard.html", map[string]string{
-				"user": strings.Split(email, "@")[0],
-			})
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
 		}
 
+		// user exists; show the sauce!
+
+		err := templates.ExecuteTemplate(w, "dashboard.html", map[string]string{
+			"user": strings.Split(email, "@")[0],
+		})
+		if err != nil {
+			log.Println(err)
+		}
+	})
+
+	loginType := "implicit"
+	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		if loginType == "implicit" {
+			http.Redirect(w, r, oauth2Config.AuthCodeURL("abcdefghijkl"), http.StatusFound)
+			return
+		}
+
+		templates := template.Must(template.ParseGlob("templates/*.html"))
+		err := templates.ExecuteTemplate(w, "explicit-login.html", map[string]string{
+			"url": oauth2Config.AuthCodeURL("abcdefghijkl"),
+		})
 		if err != nil {
 			log.Println(err)
 		}
@@ -102,7 +114,15 @@ func main() {
 	events.AutoStream = false
 	events.CreateStream("messages")
 
+	embed := http.NewServeMux()
+	embed.Handle("/", http.FileServer(http.Dir("./static")))
+
 	combined := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.Host, "dashboards.localtest.me") {
+			embed.ServeHTTP(w, r)
+			return
+		}
+
 		sessionH := session.LoadAndSave(mux)
 		if r.URL.Path == "/events" {
 			events.ServeHTTP(w, r)
@@ -126,6 +146,8 @@ func main() {
 
 			options := []string{"lax", "strict", "none"}
 			choice := c.MultiChoice(options, "Set Cookie SameSite")
+			c.Println()
+
 			switch choice {
 			case 0:
 				session.Cookie.SameSite = http.SameSiteLaxMode
@@ -144,6 +166,29 @@ func main() {
 
 			events.Publish("messages", &sse.Event{
 				Data: []byte("samesite=" + options[choice]),
+			})
+		},
+	})
+	shell.AddCmd(&ishell.Cmd{
+		Name: "login-type",
+		Help: "set login type",
+		Func: func(c *ishell.Context) {
+
+			options := []string{"implicit", "explicit"}
+			choice := c.MultiChoice(options, "Set Login Type")
+			c.Println()
+
+			loginType = options[choice]
+
+			err := session.Iterate(context.Background(), func(c context.Context) error {
+				return session.Destroy(c)
+			})
+			if err != nil {
+				log.Println(err)
+			}
+
+			events.Publish("messages", &sse.Event{
+				Data: []byte("login-type=" + loginType),
 			})
 		},
 	})

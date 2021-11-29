@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Embed</title>
+</head>
+<body>
+<h2>Some charts below...</h2>
+<br>
+<iframe src="https://app.vcap.me:8443/" width="600" height="400" style="border: 1px dashed gray"></iframe>
+</body>
+<script>
+    const es = new EventSource("/events?stream=messages")
+    es.addEventListener('message', (ev) => {
+        console.log(ev.data, ev.lastEventId)
+        window.location.reload()
+    })
+</script>
+</html>
