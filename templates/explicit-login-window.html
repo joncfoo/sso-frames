@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+</head>
+<body>
+<h2>Not logged in</h2>
+<br>
+<strong><a href="{{.url}}" target="login">Login</a></strong>
+</body>
+<script>
+    window.addEventListener('message', (ev) => {
+        if (ev.origin === window.location.origin) {
+            if (ev.data === 'logged-in') {
+                ev.source.close()
+                window.location = '/'
+            }
+        }
+    })
+
+    const es = new EventSource("/events?stream=messages")
+    es.addEventListener('message', (ev) => {
+        window.location = "/"
+    })
+</script>
+</html>

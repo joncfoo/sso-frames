@@ -36,6 +36,13 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
+	loginType := "implicit-login"
+	dashboardType := map[string]string{
+		"implicit-login":        "dashboard.html",
+		"explicit-login":        "dashboard.html",
+		"explicit-login-window": "dashboard-close-login.html",
+	}
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		templates := template.Must(template.ParseGlob("templates/*.html"))
 
@@ -49,8 +56,7 @@ func main() {
 		}
 
 		// user exists; show the sauce!
-
-		err := templates.ExecuteTemplate(w, "dashboard.html", map[string]string{
+		err := templates.ExecuteTemplate(w, dashboardType[loginType], map[string]string{
 			"user": strings.Split(email, "@")[0],
 		})
 		if err != nil {
@@ -58,15 +64,14 @@ func main() {
 		}
 	})
 
-	loginType := "implicit"
 	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
-		if loginType == "implicit" {
+		if loginType == "implicit-login" {
 			http.Redirect(w, r, oauth2Config.AuthCodeURL("abcdefghijkl"), http.StatusFound)
 			return
 		}
 
 		templates := template.Must(template.ParseGlob("templates/*.html"))
-		err := templates.ExecuteTemplate(w, "explicit-login.html", map[string]string{
+		err := templates.ExecuteTemplate(w, loginType+".html", map[string]string{
 			"url": oauth2Config.AuthCodeURL("abcdefghijkl"),
 		})
 		if err != nil {
@@ -174,7 +179,7 @@ func main() {
 		Help: "set login type",
 		Func: func(c *ishell.Context) {
 
-			options := []string{"implicit", "explicit"}
+			options := []string{"implicit-login", "explicit-login", "explicit-login-window"}
 			choice := c.MultiChoice(options, "Set Login Type")
 			c.Println()
 
