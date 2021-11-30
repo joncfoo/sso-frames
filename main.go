@@ -36,11 +36,12 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
-	loginType := "implicit-login"
+	loginType := "implicit"
 	dashboardType := map[string]string{
-		"implicit-login":        "dashboard.html",
-		"explicit-login":        "dashboard.html",
-		"explicit-login-window": "dashboard-close-login.html",
+		"implicit":                "dashboard.html",
+		"explicit":                "dashboard.html",
+		"explicit-window":         "dashboard-close-login.html",
+		"explicit-storage-access": "dashboard-close-login.html",
 	}
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +66,7 @@ func main() {
 	})
 
 	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
-		if loginType == "implicit-login" {
+		if loginType == "implicit" {
 			http.Redirect(w, r, oauth2Config.AuthCodeURL("abcdefghijkl"), http.StatusFound)
 			return
 		}
@@ -179,7 +180,7 @@ func main() {
 		Help: "set login type",
 		Func: func(c *ishell.Context) {
 
-			options := []string{"implicit-login", "explicit-login", "explicit-login-window"}
+			options := []string{"implicit", "explicit", "explicit-window", "explicit-storage-access"}
 			choice := c.MultiChoice(options, "Set Login Type")
 			c.Println()
 

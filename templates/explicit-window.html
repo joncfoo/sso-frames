@@ -19,9 +19,6 @@
         }
     })
 
-    const es = new EventSource("/events?stream=messages")
-    es.addEventListener('message', (ev) => {
-        window.location = "/"
-    })
+    new EventSource("/events?stream=messages").addEventListener('message', () => window.location = '/');
 </script>
 </html>

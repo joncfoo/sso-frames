@@ -11,10 +11,6 @@
 </p>
 </body>
 <script>
-    const es = new EventSource("/events?stream=messages")
-    es.addEventListener('message', (ev) => {
-        console.log(ev.data, ev.lastEventId)
-        window.location.reload()
-    })
+    new EventSource("/events?stream=messages").addEventListener('message', () => window.location.reload());
 </script>
 </html>

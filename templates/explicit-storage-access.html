@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+</head>
+<body>
+<h2>Not logged in</h2>
+<br>
+<strong><a id="login" href="{{.url}}" target="login">Login</a></strong>
+</body>
+<script>
+    window.addEventListener('message', (ev) => {
+        if (ev.origin === window.location.origin) {
+            if (ev.data === 'logged-in') {
+                ev.source.close()
+                window.location = '/'
+            }
+        }
+    });
+
+    function setupLogin() {
+        document.hasStorageAccess()
+            .then(hasAccess => {
+                if (!hasAccess) {
+                    // browser/user has not given us access yet
+
+                    const loginButton = document.querySelector('#login')
+                    loginButton.addEventListener('click', (ev) => {
+                        ev.preventDefault()
+
+                        document.requestStorageAccess()
+                            .then(() => {
+                                // open login page
+                                window.open(loginButton.href, loginButton.target)
+                            })
+                            .catch(e => {
+                                // we were explicitly denied access
+                                // or in Safari the user never visited this site on its own
+                                window.parent.postMessage('never-visited', '*')
+                            })
+                    })
+                }
+            })
+            .catch(e => console.error('hasStorageAccess error', e))
+    }
+
+    if (document.hasStorageAccess && window.top !== window) {
+        setupLogin()
+    }
+
+    new EventSource("/events?stream=messages").addEventListener('message', () => window.location = '/');
+</script>
+</html>
